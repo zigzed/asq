@@ -1,0 +1,60 @@
+package asq
+
+import (
+	"context"
+
+	"github.com/zigzed/asq/task"
+)
+
+type App struct {
+	mgr     *fnManager
+	broker  Broker
+	backend Backend
+	logger  Logger
+}
+
+type Options func(*App)
+
+func WithLogger(logger Logger) Options {
+	return func(app *App) {
+		app.logger = logger
+	}
+}
+
+func NewApp(broker Broker, backend Backend, opts ...Options) *App {
+	app := &App{
+		mgr:     newFnManager(),
+		broker:  broker,
+		backend: backend,
+		logger:  defaultLogger{},
+	}
+	for _, opt := range opts {
+		opt(app)
+	}
+	return app
+}
+
+func (app *App) Register(name string, fn interface{}) error {
+	return app.mgr.register(name, fn)
+}
+
+func (app *App) StartWorker(ctx context.Context, size int) error {
+	worker := newWorker(app.broker, app.backend, app.mgr, app.logger)
+	return worker.Start(ctx, size)
+}
+
+func (app *App) SubmitTask(ctx context.Context, tasks ...*task.Task) error {
+	if task := app.makeTaskLink(tasks...); task != nil {
+		return app.broker.Push(ctx, task)
+	}
+	return nil
+}
+
+func (app *App) makeTaskLink(tasks ...*task.Task) *task.Task {
+	for i := len(tasks) - 1; i > 0; i-- {
+		if i > 0 {
+			tasks[i-1].OnSuccess = []*task.Task{tasks[i]}
+		}
+	}
+	return tasks[0]
+}
