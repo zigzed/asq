@@ -7,6 +7,6 @@ import (
 )
 
 type Backend interface {
-	Push(ctx context.Context, results result.Result) error
-	// Poll(ctx context.Context, name string, task chan<- Task, event chan<- error) error
+	Push(ctx context.Context, results *result.Result) error
+	Poll(ctx context.Context, id, name string) ([]interface{}, bool, error)
 }

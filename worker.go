@@ -83,7 +83,15 @@ func (w *Worker) execute(ctx context.Context, task *task.Task) error {
 	// 函数执行没有返回错误
 	if lastValue == nil {
 		if len(task.OnSuccess) == 0 {
-			return w.backend.Push(ctx, *result.NewResult(task.Id, task.Name, returns, 15*time.Second))
+			if !task.Option.IgnoreResult {
+				return w.backend.Push(ctx,
+					result.NewResult(
+						task.Id,
+						task.Name,
+						returns,
+						time.Duration(task.Option.ResultExpired)*time.Second))
+			}
+			return nil
 		}
 		task = task.OnSuccess[0]
 		if len(returns) > 0 {

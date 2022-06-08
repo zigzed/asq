@@ -2,7 +2,10 @@ package asq
 
 import (
 	"context"
+	"time"
 
+	"emperror.dev/errors"
+	"github.com/google/uuid"
 	"github.com/zigzed/asq/task"
 )
 
@@ -43,11 +46,28 @@ func (app *App) StartWorker(ctx context.Context, size int) error {
 	return worker.Start(ctx, size)
 }
 
-func (app *App) SubmitTask(ctx context.Context, tasks ...*task.Task) error {
-	if task := app.makeTaskLink(tasks...); task != nil {
-		return app.broker.Push(ctx, task)
+func (app *App) SubmitTask(ctx context.Context, tasks ...*task.Task) (*AsyncResult, error) {
+	for _, task := range tasks {
+		if task.Id == "" {
+			task.Id = uuid.New().String()
+		}
 	}
-	return nil
+	if task := app.makeTaskLink(tasks...); task != nil {
+		if err := app.broker.Push(ctx, task); err != nil {
+			return nil, errors.Wrapf(err, "push task %v failed", tasks)
+		}
+	}
+	if len(tasks) > 0 {
+		task := tasks[len(tasks)-1]
+		return &AsyncResult{
+			backend:      app.backend,
+			pollInterval: 500 * time.Millisecond,
+			id:           task.Id,
+			name:         task.Name,
+		}, nil
+	}
+
+	return nil, nil
 }
 
 func (app *App) makeTaskLink(tasks ...*task.Task) *task.Task {

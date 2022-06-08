@@ -51,32 +51,43 @@ func testC(i int) (int, error) {
 	return i * 2, nil
 }
 
-type simpleStruct struct {
+type SimpleStruct struct {
 	A string
 	B int
 	C struct {
 		M string
 		N sql.NullString
-		P *int64
+		P *int
 	}
 }
 
-func testD(v simpleStruct) error {
+func testD(v SimpleStruct) error {
 	fmt.Printf("  in testD(%+v) done\n", v)
 	return nil
 }
 
-var testEv = 5
+var testEv = 3
 
-func testE(v *int) error {
+func testE(v *int) (*SimpleStruct, error) {
 	testEv--
 	if testEv > 0 {
 		fmt.Printf("  inTestE(%v) error\n", testEv)
-		return errors.Errorf("test error %d", testEv)
+		return nil, errors.Errorf("test error %d", testEv)
 	}
 
 	fmt.Printf("  inTestE(%v) done\n", testEv)
-	return nil
+	return &SimpleStruct{
+		A: "result_A",
+		B: testEv,
+		C: struct {
+			M string
+			N sql.NullString
+			P *int
+		}{
+			M: "result_M",
+			P: v,
+		},
+	}, nil
 }
 
 func TestAsq(t *testing.T) {
@@ -139,8 +150,26 @@ func TestAsq(t *testing.T) {
 	// is.NoErr(err)
 
 	v := 2
-	err = app.SubmitTask(ctx, task.NewTask(task.NewTaskOption(3, 2*time.Second), "testE", &v))
+	ar, err := app.SubmitTask(ctx,
+		task.NewTask(
+			task.NewTaskOption(3, 2*time.Second).WithResultExpired(2*time.Minute),
+			"testE",
+			&v))
 	is.NoErr(err)
+	is.NotNil(ar)
+	res, ok, err := ar.Wait(context.Background())
+	is.NoErr(err)
+	is.Equal(len(res), 1)
+	is.True(ok)
+	val, ok := res[0].(SimpleStruct)
+	is.True(ok)
+	is.NotNil(val)
+	is.Equal(val.A, "result_A")
+	is.Equal(val.B, 0)
+	is.Equal(val.C.M, "result_M")
+	is.NotNil(val.C.P)
+	is.Equal(*val.C.P, v)
+	fmt.Printf("testE result: %v, %v, %v\n", val, ok, err)
 
 	time.Sleep(1500 * time.Second)
 }

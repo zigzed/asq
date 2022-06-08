@@ -3,14 +3,15 @@ package task
 import (
 	"time"
 
-	"github.com/gofrs/uuid"
+	"github.com/google/uuid"
 )
 
 type TaskOption struct {
-	RetryCount   int
-	RetryTimeout int
-	IgnoreResult bool
-	StartAt      *int64
+	RetryCount    int
+	RetryTimeout  int
+	ResultExpired int
+	IgnoreResult  bool
+	StartAt       *int64
 }
 
 type Task struct {
@@ -24,9 +25,10 @@ type Task struct {
 
 func NewTaskOption(retryCount int, retryTimeout time.Duration) *TaskOption {
 	return &TaskOption{
-		RetryCount:   retryCount,
-		RetryTimeout: int(retryTimeout.Milliseconds()),
-		IgnoreResult: false,
+		RetryCount:    retryCount,
+		RetryTimeout:  int(retryTimeout.Milliseconds()),
+		IgnoreResult:  false,
+		ResultExpired: 15,
 	}
 }
 
@@ -41,14 +43,18 @@ func (to *TaskOption) WithStartAt(eta time.Time) *TaskOption {
 	return to
 }
 
+func (to *TaskOption) WithResultExpired(in time.Duration) *TaskOption {
+	to.ResultExpired = int(in.Seconds())
+	return to
+}
+
 func NewTask(opt *TaskOption, name string, args ...interface{}) *Task {
-	id, _ := uuid.NewV4()
 	if opt == nil {
 		opt = NewTaskOption(1, 3)
 	}
 	return &Task{
 		Option: *opt,
-		Id:     id.String(),
+		Id:     uuid.New().String(),
 		Name:   name,
 		Args:   args,
 	}
