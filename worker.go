@@ -114,8 +114,7 @@ func (w *Worker) execute(ctx context.Context, task *task.Task) error {
 		}
 	}
 
-	task.Option.RetryCount -= 1
-	if task.Option.RetryCount <= 0 {
+	if task.Option.RetryCount <= task.BackOff.Attempts {
 		err, _ := lastError.(error)
 		return w.backend.Push(ctx,
 			result.NewResult(
@@ -126,7 +125,11 @@ func (w *Worker) execute(ctx context.Context, task *task.Task) error {
 				time.Duration(task.Option.ResultExpired)*time.Second))
 	}
 
-	scheduleAt := time.Now().Add(time.Duration(task.Option.RetryTimeout) * time.Millisecond).UnixMilli()
+	nextAttempt := task.BackOff.NextAttempt()
+	w.logger.Errorf("task %s, %s failed: %v, next attempt in %.3f seconds",
+		task.Name, task.Id, lastError, nextAttempt.Seconds())
+
+	scheduleAt := time.Now().Add(nextAttempt).UnixMilli()
 	task.Option.StartAt = new(int64)
 	*task.Option.StartAt = scheduleAt
 	return w.broker.Push(ctx, task)

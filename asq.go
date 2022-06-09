@@ -5,6 +5,7 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/google/uuid"
+	"github.com/zigzed/asq/redis"
 	"github.com/zigzed/asq/task"
 )
 
@@ -34,6 +35,19 @@ func NewApp(broker Broker, backend Backend, opts ...Options) *App {
 		opt(app)
 	}
 	return app
+}
+
+func NewAppFromRedis(cfg redis.Option, queue string, opts ...Options) (*App, error) {
+	broker, err := redis.NewBroker(&cfg, queue)
+	if err != nil {
+		return nil, err
+	}
+	backend, err := redis.NewBackend(&cfg, queue)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewApp(broker, backend, opts...), nil
 }
 
 func (app *App) Register(name string, fn interface{}) error {

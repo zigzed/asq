@@ -21,6 +21,7 @@ type Task struct {
 	Args      []interface{}
 	OnSuccess []*Task
 	OnFailed  []*Task
+	BackOff   *BackOff
 }
 
 func NewTaskOption(retryCount int, retryTimeout time.Duration) *TaskOption {
@@ -53,9 +54,10 @@ func NewTask(opt *TaskOption, name string, args ...interface{}) *Task {
 		opt = NewTaskOption(1, 3)
 	}
 	return &Task{
-		Option: *opt,
-		Id:     uuid.New().String(),
-		Name:   name,
-		Args:   args,
+		Option:  *opt,
+		Id:      uuid.New().String(),
+		Name:    name,
+		Args:    args,
+		BackOff: newBackOff(time.Duration(opt.RetryTimeout)*time.Millisecond, 1.5),
 	}
 }
