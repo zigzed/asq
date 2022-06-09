@@ -152,20 +152,20 @@ func TestAsq(t *testing.T) {
 	is.NoErr(errc)
 	fmt.Printf("testC result: %+v, %+v\n", valc, errc)
 
-	// err = app.SubmitTask(ctx, task.NewTask(nil, "testD", simpleStruct{
-	// 	A: "a",
-	// 	B: 1,
-	// 	C: struct {
-	// 		M string
-	// 		N sql.NullString
-	// 		P *int64
-	// 	}{
-	// 		M: "m",
-	// 		N: sql.NullString{Valid: true, String: "n"},
-	// 		P: new(int64),
-	// 	},
-	// }))
-	// is.NoErr(err)
+	_, err = app.SubmitTask(context.Background(), task.NewTask(nil, "testD", simpleStruct{
+		A: "a",
+		B: 1,
+		C: struct {
+			M string
+			N sql.NullString
+			P *int
+		}{
+			M: "m",
+			N: sql.NullString{Valid: true, String: "n"},
+			P: new(int),
+		},
+	}))
+	is.NoErr(err)
 
 	testEv = 5
 	v := 2
@@ -214,5 +214,32 @@ func TestAsq(t *testing.T) {
 			"testA"))
 	is.NoErr(err)
 
-	time.Sleep(1500 * time.Second)
+	ar, err = app.SubmitTask(ctx,
+		task.NewTask(nil, "testC", 300),
+		task.NewTask(nil, "testB"))
+	is.NoErr(err)
+	ok, err = ar.Wait(context.Background(), 500*time.Millisecond)
+	is.NoErr(err)
+	is.True(ok)
+
+	ar, err = app.SubmitTask(ctx,
+		task.NewTask(nil, "testC", 500),
+		task.NewTask(nil, "testC"),
+		task.NewTask(nil, "testC"))
+	is.NoErr(err)
+	ok, err = ar.Wait(context.Background(), 500*time.Millisecond, &valc)
+	is.NoErr(err)
+	is.True(ok)
+	is.Equal(valc, 4000)
+
+	ar, err = app.SubmitTask(ctx,
+		task.NewTask(nil, "testA"),
+		task.NewTask(nil, "testC", 200),
+		task.NewTask(nil, "testC"))
+	is.NoErr(err)
+	ok, err = ar.Wait(context.Background(), 500*time.Millisecond, &valc)
+	is.NoErr(err)
+	is.True(ok)
+	is.Equal(valc, 800)
+
 }
