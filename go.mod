@@ -9,7 +9,6 @@ require (
 
 require (
 	github.com/go-redis/redis/v8 v8.11.5
-	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/golang/glog v1.0.0
 	github.com/google/uuid v1.3.0
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f

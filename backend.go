@@ -8,5 +8,5 @@ import (
 
 type Backend interface {
 	Push(ctx context.Context, results *result.Result) error
-	Poll(ctx context.Context, id, name string) ([]interface{}, bool, error)
+	Scan(ctx context.Context, id, name string, args ...interface{}) (bool, error)
 }

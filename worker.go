@@ -89,20 +89,28 @@ func (w *Worker) execute(ctx context.Context, task *task.Task) error {
 						task.Id,
 						task.Name,
 						returns,
+						nil,
 						time.Duration(task.Option.ResultExpired)*time.Second))
 			}
 			return nil
 		}
 		task = task.OnSuccess[0]
-		if len(returns) > 0 {
+		if len(returns) > 1 {
 			task.Args = append(task.Args, returns...)
 		}
 		return w.broker.Push(ctx, task)
 	}
 
 	task.Option.RetryCount -= 1
-	if task.Option.RetryCount < 0 {
-		return errors.Wrapf(err, "execute %v failed", task)
+	if task.Option.RetryCount <= 0 {
+		err, _ := lastValue.(error)
+		return w.backend.Push(ctx,
+			result.NewResult(
+				task.Id,
+				task.Name,
+				returns,
+				err,
+				time.Duration(task.Option.ResultExpired)*time.Second))
 	}
 
 	scheduleAt := time.Now().Add(time.Duration(task.Option.RetryTimeout) * time.Millisecond).UnixMilli()

@@ -52,7 +52,7 @@ func NewBackend(opt *Option, queueName string) (*backend, error) {
 func (b *backend) Push(ctx context.Context, result *result.Result) error {
 	key := b.makeTaskKeyForBackend(result.Id, result.Name)
 
-	buf, err := b.opt.Marshaller.EncodeResult(result.Results)
+	buf, err := b.opt.Marshaller.EncodeResult(result.Results, result.Error)
 	if err != nil {
 		return errors.Wrapf(err, "encode result %v for %s, %s failed",
 			result.Results, result.Name, result.Id)
@@ -62,26 +62,26 @@ func (b *backend) Push(ctx context.Context, result *result.Result) error {
 	return err
 }
 
-func (b *backend) Poll(ctx context.Context, id, name string) ([]interface{}, bool, error) {
+func (b *backend) Scan(ctx context.Context, id, name string, args ...interface{}) (bool, error) {
 	key := b.makeTaskKeyForBackend(id, name)
 
 	res, err := b.rdb.Get(ctx, key).Result()
 	if err == redis.Nil {
-		return nil, false, nil
+		return false, nil
 	}
 	if err != nil {
-		return nil, false, nil
+		return false, nil
 	}
 
-	results, err := b.opt.Marshaller.DecodeResult(res)
-	if err != nil {
-		return nil, false, errors.Wrapf(err, "unmarshal result for %s, %s, %s failed",
+	ok, err := b.opt.Marshaller.DecodeResult(res, args...)
+	if !ok {
+		return true, errors.Wrapf(err, "unmarshal result for %s, %s, %s failed",
 			name, id, res)
 	}
 
 	b.rdb.Del(ctx, key)
 
-	return results, true, nil
+	return true, err
 }
 
 func (b *backend) Close() error {

@@ -6,14 +6,13 @@ import (
 )
 
 type AsyncResult struct {
-	backend      Backend
-	pollInterval time.Duration
-	id           string
-	name         string
+	backend Backend
+	id      string
+	name    string
 }
 
-func (ar *AsyncResult) Wait(ctx context.Context) ([]interface{}, bool, error) {
-	tick := time.NewTicker(ar.pollInterval)
+func (ar *AsyncResult) Wait(ctx context.Context, interval time.Duration, args ...interface{}) (bool, error) {
+	tick := time.NewTicker(interval)
 
 Loop:
 	for {
@@ -21,18 +20,15 @@ Loop:
 		case <-ctx.Done():
 			break Loop
 		case <-tick.C:
-			r, ok, err := ar.backend.Poll(ctx, ar.id, ar.name)
-			if err != nil {
-				continue
-			}
+			ok, err := ar.backend.Scan(ctx, ar.id, ar.name, args...)
 			if !ok {
 				continue
 			}
-			return r, true, nil
+			return true, err
 		}
 	}
 
 	tick.Stop()
 
-	return nil, false, nil
+	return false, nil
 }

@@ -51,7 +51,7 @@ func testC(i int) (int, error) {
 	return i * 2, nil
 }
 
-type SimpleStruct struct {
+type simpleStruct struct {
 	A string
 	B int
 	C struct {
@@ -61,22 +61,16 @@ type SimpleStruct struct {
 	}
 }
 
-func testD(v SimpleStruct) error {
+func testD(v simpleStruct) error {
 	fmt.Printf("  in testD(%+v) done\n", v)
 	return nil
 }
 
-var testEv = 3
+var testEv = 5
 
-func testE(v *int) (*SimpleStruct, error) {
+func testE(v *int) (*simpleStruct, error) {
 	testEv--
-	if testEv > 0 {
-		fmt.Printf("  inTestE(%v) error\n", testEv)
-		return nil, errors.Errorf("test error %d", testEv)
-	}
-
-	fmt.Printf("  inTestE(%v) done\n", testEv)
-	return &SimpleStruct{
+	r := &simpleStruct{
 		A: "result_A",
 		B: testEv,
 		C: struct {
@@ -87,7 +81,14 @@ func testE(v *int) (*SimpleStruct, error) {
 			M: "result_M",
 			P: v,
 		},
-	}, nil
+	}
+	if testEv > 0 {
+		fmt.Printf("  inTestE(%v) error\n", testEv)
+		return r, errors.Errorf("test error %d", testEv)
+	}
+
+	fmt.Printf("  inTestE(%v) done\n", testEv)
+	return r, nil
 }
 
 func TestAsq(t *testing.T) {
@@ -125,14 +126,24 @@ func TestAsq(t *testing.T) {
 		is.NoErr(err)
 	}()
 
-	// err = app.SubmitTask(ctx, task.NewTask(nil, "testA"))
-	// is.NoErr(err)
+	_, err = app.SubmitTask(ctx, task.NewTask(nil, "testA"))
+	is.NoErr(err)
 
-	// err = app.SubmitTask(ctx, task.NewTask(nil, "testB", 3))
-	// is.NoErr(err)
+	_, err = app.SubmitTask(ctx, task.NewTask(nil, "testB", 3))
+	is.NoErr(err)
 
-	// err = app.SubmitTask(ctx, task.NewTask(nil, "testC", 30))
-	// is.NoErr(err)
+	ar, err := app.SubmitTask(ctx, task.NewTask(nil, "testC", 30))
+	is.NoErr(err)
+	is.NotNil(ar)
+	var (
+		valc int
+		errc error
+	)
+	ok, err := ar.Wait(context.Background(), 500*time.Millisecond, &valc)
+	is.True(ok)
+	is.Equal(valc, 60)
+	is.NoErr(errc)
+	fmt.Printf("testC result: %+v, %+v\n", valc, errc)
 
 	// err = app.SubmitTask(ctx, task.NewTask(nil, "testD", simpleStruct{
 	// 	A: "a",
@@ -149,27 +160,39 @@ func TestAsq(t *testing.T) {
 	// }))
 	// is.NoErr(err)
 
+	testEv = 5
 	v := 2
-	ar, err := app.SubmitTask(ctx,
+	ar, err = app.SubmitTask(ctx,
 		task.NewTask(
 			task.NewTaskOption(3, 2*time.Second).WithResultExpired(2*time.Minute),
 			"testE",
 			&v))
 	is.NoErr(err)
 	is.NotNil(ar)
-	res, ok, err := ar.Wait(context.Background())
+
+	var (
+		vale simpleStruct
+	)
+	ok, err = ar.Wait(context.Background(), 500*time.Millisecond, &vale)
+	is.True(ok)
+	is.Err(err)
+	fmt.Printf("testE result: %v, %v, %v\n", vale, ok, err)
+
+	testEv = 2
+	ar, err = app.SubmitTask(ctx,
+		task.NewTask(
+			task.NewTaskOption(3, 2*time.Second).WithResultExpired(2*time.Minute),
+			"testE",
+			&v))
+	ok, err = ar.Wait(context.Background(), 500*time.Millisecond, &vale)
 	is.NoErr(err)
-	is.Equal(len(res), 1)
 	is.True(ok)
-	val, ok := res[0].(SimpleStruct)
-	is.True(ok)
-	is.NotNil(val)
-	is.Equal(val.A, "result_A")
-	is.Equal(val.B, 0)
-	is.Equal(val.C.M, "result_M")
-	is.NotNil(val.C.P)
-	is.Equal(*val.C.P, v)
-	fmt.Printf("testE result: %v, %v, %v\n", val, ok, err)
+	is.Equal(vale.A, "result_A")
+	is.Equal(vale.B, 0)
+	is.Equal(vale.C.M, "result_M")
+	is.NotNil(vale.C.P)
+	is.Equal(*vale.C.P, v)
+	fmt.Printf("testE result: %v, %v, %v\n", vale, ok, err)
 
 	time.Sleep(1500 * time.Second)
 }
