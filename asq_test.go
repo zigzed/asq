@@ -91,6 +91,11 @@ func testE(v *int) (*simpleStruct, error) {
 	return r, nil
 }
 
+func testF() error {
+	panic("  testF panic")
+	return nil
+}
+
 func TestAsq(t *testing.T) {
 	flag.Parse()
 
@@ -117,12 +122,14 @@ func TestAsq(t *testing.T) {
 	is.NoErr(err)
 	err = app.Register("testE", testE)
 	is.NoErr(err)
+	err = app.Register("testF", testF)
+	is.NoErr(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	go func() {
-		err = app.StartWorker(ctx, 1)
+		err = app.StartWorker(ctx, 2)
 		is.NoErr(err)
 	}()
 
@@ -193,6 +200,19 @@ func TestAsq(t *testing.T) {
 	is.NotNil(vale.C.P)
 	is.Equal(*vale.C.P, v)
 	fmt.Printf("testE result: %v, %v, %v\n", vale, ok, err)
+
+	ar, err = app.SubmitTask(ctx,
+		task.NewTask(
+			nil,
+			"testF"))
+	ok, err = ar.Wait(context.Background(), 500*time.Millisecond)
+	fmt.Printf("testF result: %v, %v\n", ok, err)
+
+	_, err = app.SubmitTask(ctx,
+		task.NewTask(
+			nil,
+			"testA"))
+	is.NoErr(err)
 
 	time.Sleep(1500 * time.Second)
 }

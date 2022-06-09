@@ -74,36 +74,49 @@ func (w *Worker) execute(ctx context.Context, task *task.Task) error {
 		return errors.Wrapf(err, "function %s not found", task.Name)
 	}
 
-	returns, err := w.invoker.Invoke(fn, task.Args)
+	var lastError interface{}
+	invoke := func(p Invoker, fn interface{}, args []interface{}) ([]interface{}, error) {
+		defer func() {
+			if r := recover(); r != nil {
+				lastError = errors.Errorf("panic: invoke %v failed: %v", task, r)
+				w.logger.Errorf("panic: invoke %v failed: %v", task, r)
+			}
+		}()
+		return p.Invoke(fn, args)
+	}
+
+	returns, err := invoke(w.invoker, fn, task.Args)
 	if err != nil {
 		return errors.Wrapf(err, "execute %v failed", task)
 	}
 
-	lastValue, returns := returns[len(returns)-1], returns[:len(returns)-1]
-	// 函数执行没有返回错误
-	if lastValue == nil {
-		if len(task.OnSuccess) == 0 {
-			if !task.Option.IgnoreResult {
-				return w.backend.Push(ctx,
-					result.NewResult(
-						task.Id,
-						task.Name,
-						returns,
-						nil,
-						time.Duration(task.Option.ResultExpired)*time.Second))
+	if len(returns) > 0 {
+		lastError, returns = returns[len(returns)-1], returns[:len(returns)-1]
+		// 函数执行没有返回错误
+		if lastError == nil {
+			if len(task.OnSuccess) == 0 {
+				if !task.Option.IgnoreResult {
+					return w.backend.Push(ctx,
+						result.NewResult(
+							task.Id,
+							task.Name,
+							returns,
+							nil,
+							time.Duration(task.Option.ResultExpired)*time.Second))
+				}
+				return nil
 			}
-			return nil
+			task = task.OnSuccess[0]
+			if len(returns) >= 1 {
+				task.Args = append(task.Args, returns...)
+			}
+			return w.broker.Push(ctx, task)
 		}
-		task = task.OnSuccess[0]
-		if len(returns) > 1 {
-			task.Args = append(task.Args, returns...)
-		}
-		return w.broker.Push(ctx, task)
 	}
 
 	task.Option.RetryCount -= 1
 	if task.Option.RetryCount <= 0 {
-		err, _ := lastValue.(error)
+		err, _ := lastError.(error)
 		return w.backend.Push(ctx,
 			result.NewResult(
 				task.Id,
