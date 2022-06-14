@@ -1,6 +1,10 @@
 package asq
 
-import "github.com/golang/glog"
+import (
+	"fmt"
+
+	"github.com/golang/glog"
+)
 
 type Logger interface {
 	Infof(format string, args ...interface{})
@@ -11,13 +15,13 @@ type Logger interface {
 type defaultLogger struct{}
 
 func (dl defaultLogger) Infof(format string, args ...interface{}) {
-	glog.Infof(format, args...)
+	glog.InfoDepth(1, fmt.Sprintf(format, args...))
 }
 
 func (dl defaultLogger) Errorf(format string, args ...interface{}) {
-	glog.Errorf(format, args...)
+	glog.ErrorDepth(1, fmt.Sprintf(format, args...))
 }
 
 func (dl defaultLogger) Fatalf(format string, args ...interface{}) {
-	glog.Fatalf(format, args...)
+	glog.FatalDepth(1, fmt.Sprintf(format, args...))
 }

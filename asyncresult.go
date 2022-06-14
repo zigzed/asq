@@ -32,3 +32,18 @@ Loop:
 
 	return false, nil
 }
+
+// func (ar *AsyncResult) Then(ctx context.Context, interval time.Duration, fn interface{}) {
+// 	funcT := reflect.TypeOf(fn)
+// 	param := make([]interface{}, funcT.NumIn())
+// 	for i := 0; i < funcT.NumIn(); i++ {
+// 		param[i] = reflect.New(funcT.In(i)).Interface()
+// 	}
+
+// 	go func() {
+// 		ok, err := ar.Wait(ctx, interval, param...)
+// 		if ok && err == nil {
+// 			invoker.NewGenericInvoker().Invoke(fn, param)
+// 		}
+// 	}()
+// }

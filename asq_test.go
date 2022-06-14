@@ -319,6 +319,18 @@ func TestAsq(t *testing.T) {
 	is.Equal(m, "mm")
 	is.Equal(n, 111)
 	br()
+
+	// ar, err := app.SubmitTask(ctx,
+	// 	task.NewTask(nil, "testG", 3, 6, 9))
+	// is.NoErr(err)
+	// var wg sync.WaitGroup
+	// wg.Add(1)
+	// ar.Then(context.Background(), interval, func(a, b, c int) {
+	// 	fmt.Printf("  inTestG::Then(%d, %d, %d)\n", a, b, c)
+	// 	wg.Done()
+	// })
+	// wg.Wait()
+	// br()
 }
 
 func br() {

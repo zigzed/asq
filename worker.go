@@ -57,7 +57,7 @@ Loop:
 				}
 				if task != nil {
 					if err := w.execute(ctx, task); err != nil {
-						w.logger.Errorf("execute task %s for %v failed: %v", name, task, err)
+						w.logger.Errorf("execute task %s failed: %v", name, err)
 					}
 				}
 			}
@@ -69,6 +69,12 @@ Loop:
 }
 
 func (w *Worker) execute(ctx context.Context, task *task.Task) error {
+	defer func() {
+		if r := recover(); r != nil {
+			w.logger.Errorf("panic: execute task %+v failed: %v", task, r)
+		}
+	}()
+
 	fn, err := w.fnMgr.lookup(task.Name)
 	if err != nil {
 		return errors.Wrapf(err, "function %s not found", task.Name)
@@ -78,8 +84,8 @@ func (w *Worker) execute(ctx context.Context, task *task.Task) error {
 	invoke := func(p Invoker, fn interface{}, args []interface{}) ([]interface{}, error) {
 		defer func() {
 			if r := recover(); r != nil {
-				lastError = errors.Errorf("panic: invoke %v failed: %v", task, r)
-				w.logger.Errorf("panic: invoke %v failed: %v", task, r)
+				lastError = errors.Errorf("panic: invoke %+v failed: %v", task, r)
+				w.logger.Errorf("panic: invoke %+v failed: %v", task, r)
 			}
 		}()
 		return p.Invoke(fn, args)
@@ -87,7 +93,7 @@ func (w *Worker) execute(ctx context.Context, task *task.Task) error {
 
 	returns, err := invoke(w.invoker, fn, task.Args)
 	if err != nil {
-		return errors.Wrapf(err, "execute %v failed", task)
+		return errors.Wrapf(err, "execute %+v failed", task)
 	}
 
 	if len(returns) > 0 {
