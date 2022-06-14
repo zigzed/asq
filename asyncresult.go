@@ -6,13 +6,19 @@ import (
 )
 
 type AsyncResult struct {
-	backend Backend
-	id      string
-	name    string
+	backend      Backend
+	id           string
+	name         string
+	ignoreResult bool
+	pollInterval time.Duration
 }
 
-func (ar *AsyncResult) Wait(ctx context.Context, interval time.Duration, args ...interface{}) (bool, error) {
-	tick := time.NewTicker(interval)
+func (ar *AsyncResult) Wait(ctx context.Context, args ...interface{}) (bool, error) {
+	if ar.ignoreResult {
+		return true, nil
+	}
+
+	tick := time.NewTicker(ar.pollInterval)
 
 Loop:
 	for {

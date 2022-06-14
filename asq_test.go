@@ -166,7 +166,7 @@ func TestAsq(t *testing.T) {
 		valc int
 		errc error
 	)
-	ok, err := ar.Wait(context.Background(), interval, &valc)
+	ok, err := ar.Wait(context.Background(), &valc)
 	is.True(ok)
 	is.Equal(valc, 60)
 	is.NoErr(errc)
@@ -203,7 +203,7 @@ func TestAsq(t *testing.T) {
 	var (
 		vale simpleStruct
 	)
-	ok, err = ar.Wait(context.Background(), interval, &vale)
+	ok, err = ar.Wait(context.Background(), &vale)
 	is.True(ok)
 	is.Err(err)
 	fmt.Printf("testE result: %v, %v, %v\n", vale, ok, err)
@@ -215,7 +215,7 @@ func TestAsq(t *testing.T) {
 			task.NewTaskOption(3, 2*time.Second).WithResultExpired(2*time.Minute),
 			"testE",
 			&v))
-	ok, err = ar.Wait(context.Background(), interval, &vale)
+	ok, err = ar.Wait(context.Background(), &vale)
 	is.NoErr(err)
 	is.True(ok)
 	is.Equal(vale.A, "result_A")
@@ -230,7 +230,7 @@ func TestAsq(t *testing.T) {
 		task.NewTask(
 			nil,
 			"testF"))
-	ok, err = ar.Wait(context.Background(), interval)
+	ok, err = ar.Wait(context.Background())
 	fmt.Printf("testF result: %v, %v\n", ok, err)
 	br()
 
@@ -245,7 +245,7 @@ func TestAsq(t *testing.T) {
 		task.NewTask(nil, "testC", 300),
 		task.NewTask(nil, "testB"))
 	is.NoErr(err)
-	ok, err = ar.Wait(context.Background(), interval)
+	ok, err = ar.Wait(context.Background())
 	is.NoErr(err)
 	is.True(ok)
 	br()
@@ -255,7 +255,7 @@ func TestAsq(t *testing.T) {
 		task.NewTask(nil, "testC"),
 		task.NewTask(nil, "testC"))
 	is.NoErr(err)
-	ok, err = ar.Wait(context.Background(), interval, &valc)
+	ok, err = ar.Wait(context.Background(), &valc)
 	is.NoErr(err)
 	is.True(ok)
 	is.Equal(valc, 4000)
@@ -266,7 +266,7 @@ func TestAsq(t *testing.T) {
 		task.NewTask(nil, "testC", 200),
 		task.NewTask(nil, "testC"))
 	is.NoErr(err)
-	ok, err = ar.Wait(context.Background(), interval, &valc)
+	ok, err = ar.Wait(context.Background(), &valc)
 	is.NoErr(err)
 	is.True(ok)
 	is.Equal(valc, 800)
@@ -276,7 +276,7 @@ func TestAsq(t *testing.T) {
 		task.NewTask(nil, "testG", 1, 2, 3))
 	is.NoErr(err)
 	var x, y, z int
-	ok, err = ar.Wait(context.Background(), interval, &x, &y, &z)
+	ok, err = ar.Wait(context.Background(), &x, &y, &z)
 	is.NoErr(err)
 	is.True(ok)
 	is.Equal(x, 2)
@@ -289,7 +289,7 @@ func TestAsq(t *testing.T) {
 		task.NewTask(nil, "testG"),
 		task.NewTask(nil, "testG"))
 	is.NoErr(err)
-	ok, err = ar.Wait(context.Background(), interval, &x, &y, &z)
+	ok, err = ar.Wait(context.Background(), &x, &y, &z)
 	is.NoErr(err)
 	is.True(ok)
 	is.Equal(x, 800)
@@ -301,7 +301,7 @@ func TestAsq(t *testing.T) {
 		task.NewTask(nil, "testH"))
 	is.NoErr(err)
 	var ts time.Time
-	ok, err = ar.Wait(context.Background(), interval, &ts)
+	ok, err = ar.Wait(context.Background(), &ts)
 	is.NoErr(err)
 	is.True(ok)
 	diff := time.Since(ts)
@@ -313,7 +313,7 @@ func TestAsq(t *testing.T) {
 	is.NoErr(err)
 	var m string
 	var n int
-	ok, err = ar.Wait(context.Background(), interval, &n, &m)
+	ok, err = ar.Wait(context.Background(), &n, &m)
 	is.NoErr(err)
 	is.True(ok)
 	is.Equal(m, "mm")

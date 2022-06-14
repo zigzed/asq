@@ -2,6 +2,7 @@ package asq
 
 import (
 	"context"
+	"time"
 
 	"emperror.dev/errors"
 	"github.com/google/uuid"
@@ -73,9 +74,11 @@ func (app *App) SubmitTask(ctx context.Context, tasks ...*task.Task) (*AsyncResu
 	if len(tasks) > 0 {
 		task := tasks[len(tasks)-1]
 		return &AsyncResult{
-			backend: app.backend,
-			id:      task.Id,
-			name:    task.Name,
+			backend:      app.backend,
+			id:           task.Id,
+			name:         task.Name,
+			ignoreResult: task.Option.IgnoreResult,
+			pollInterval: time.Duration(task.Option.PollInterval) * time.Millisecond,
 		}, nil
 	}
 
