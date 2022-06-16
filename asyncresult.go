@@ -2,7 +2,10 @@ package asq
 
 import (
 	"context"
+	"reflect"
 	"time"
+
+	"github.com/zigzed/asq/invoker"
 )
 
 type AsyncResult struct {
@@ -39,17 +42,28 @@ Loop:
 	return false, nil
 }
 
-// func (ar *AsyncResult) Then(ctx context.Context, interval time.Duration, fn interface{}) {
-// 	funcT := reflect.TypeOf(fn)
-// 	param := make([]interface{}, funcT.NumIn())
-// 	for i := 0; i < funcT.NumIn(); i++ {
-// 		param[i] = reflect.New(funcT.In(i)).Interface()
-// 	}
+func (ar *AsyncResult) Then(ctx context.Context, onSuccess interface{}, onFailed interface{}) {
+	if ar.ignoreResult {
+		return
+	}
 
-// 	go func() {
-// 		ok, err := ar.Wait(ctx, interval, param...)
-// 		if ok && err == nil {
-// 			invoker.NewGenericInvoker().Invoke(fn, param)
-// 		}
-// 	}()
-// }
+	funcT := reflect.TypeOf(onSuccess)
+	param := make([]interface{}, funcT.NumIn())
+	for i := 0; i < funcT.NumIn(); i++ {
+		param[i] = reflect.New(funcT.In(i)).Interface()
+	}
+
+	go func() {
+		ok, err := ar.Wait(ctx, param...)
+		if ok && err == nil && onSuccess != nil {
+			args := make([]interface{}, len(param))
+			for i := 0; i < len(param); i++ {
+				args[i] = reflect.Indirect(reflect.ValueOf(param[i])).Interface()
+			}
+			invoker.NewGenericInvoker().Invoke(onSuccess, args)
+		}
+		if ok && err != nil && onFailed != nil {
+			invoker.NewGenericInvoker().Invoke(onFailed, []interface{}{err})
+		}
+	}()
+}
