@@ -117,6 +117,18 @@ func testJ() error {
 	return errors.New("inTestJ err")
 }
 
+func testK() (time.Time, error) {
+	now := time.Now()
+	fmt.Printf("  inTestK time: %s\n", now.Format("2006-01-02 15:04:05.000000"))
+	return now, nil
+}
+
+func testL() error {
+	now := time.Now()
+	fmt.Printf("  inTestK time: %s\n", now.Format("2006-01-02 15:04:05.000000"))
+	return nil
+}
+
 var interval = 50 * time.Millisecond
 
 func TestAsq(t *testing.T) {
@@ -148,6 +160,10 @@ func TestAsq(t *testing.T) {
 	err = app.Register("testI", testI)
 	is.NoErr(err)
 	err = app.Register("testJ", testJ)
+	is.NoErr(err)
+	err = app.Register("testK", testK)
+	is.NoErr(err)
+	err = app.Register("testL", testL)
 	is.NoErr(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -354,6 +370,23 @@ func TestAsq(t *testing.T) {
 			fmt.Printf("then error: %v\n", err)
 			br()
 		})
+
+	ar, err = app.SubmitTask(ctx,
+		task.NewTask(nil, "testK"))
+	is.NoErr(err)
+	ar.Then(ctx,
+		func(called time.Time) {
+			now := time.Now()
+			dif := now.Sub(called)
+			fmt.Printf("inTestK %s, timing: %.6f\n", now.Format("2006-01-02 15:04:05.000000"), dif.Seconds())
+		},
+		nil)
+
+	_, err = app.SubmitTask(ctx,
+		task.NewTask(nil, "testL"),
+		task.NewTask(nil, "testL"),
+		task.NewTask(nil, "testL"))
+	is.NoErr(err)
 
 	time.Sleep(3 * time.Second)
 }

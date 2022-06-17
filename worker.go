@@ -42,29 +42,25 @@ func (w *Worker) Start(ctx context.Context, size int) error {
 }
 
 func (w *Worker) doPoll(ctx context.Context) error {
-	tick := time.NewTicker(500 * time.Millisecond)
 Loop:
 	for {
 		select {
 		case <-ctx.Done():
 			break Loop
-		case <-tick.C:
-			for _, name := range w.fnMgr.registered() {
-				task, err := w.broker.Poll(ctx, name)
-				if err != nil {
-					w.logger.Errorf("polling for task %s failed: %v", name, err)
-					continue
-				}
-				if task != nil {
-					if err := w.execute(ctx, task); err != nil {
-						w.logger.Errorf("execute task %s failed: %v", name, err)
-					}
+		default:
+			task, err := w.broker.Poll(ctx, time.Second, w.fnMgr.registered()...)
+			if err != nil {
+				w.logger.Errorf("polling for task %v failed: %v", w.fnMgr.registered(), err)
+				continue
+			}
+			if task != nil {
+				if err := w.execute(ctx, task); err != nil {
+					w.logger.Errorf("execute task %s failed: %v", w.fnMgr.registered(), err)
 				}
 			}
 		}
 	}
 
-	tick.Stop()
 	return nil
 }
 

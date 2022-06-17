@@ -74,22 +74,26 @@ func (b *broker) Push(ctx context.Context, task *task.Task) error {
 	return nil
 }
 
-func (b *broker) Poll(ctx context.Context, name string) (*task.Task, error) {
-	return b.doPoll(ctx, name)
+func (b *broker) Poll(ctx context.Context, timeout time.Duration, names ...string) (*task.Task, error) {
+	return b.doPoll(ctx, timeout, names...)
 }
 
 func (b *broker) Close() error {
 	return b.rdb.Close()
 }
 
-func (b *broker) doPoll(ctx context.Context, name string) (*task.Task, error) {
-	taskKey := b.makeTaskKeyForBroker(name)
-	delayed := b.makeDelayedKeyForBroker(name)
+func (b *broker) doPoll(ctx context.Context, timeout time.Duration, names ...string) (*task.Task, error) {
+	taskKeys := make([]string, 0, len(names))
+	for _, name := range names {
+		taskKey := b.makeTaskKeyForBroker(name)
+		delayed := b.makeDelayedKeyForBroker(name)
+		taskKeys = append(taskKeys, taskKey)
 
-	if err := b.moveDelayed(ctx, delayed, taskKey); err != nil {
-		return nil, err
+		if err := b.moveDelayed(ctx, delayed, taskKey); err != nil {
+			return nil, err
+		}
 	}
-	buf, err := b.fetchTasks(ctx, taskKey)
+	buf, err := b.fetchTasks(ctx, timeout, taskKeys...)
 	if err != nil {
 		return nil, err
 	}
@@ -126,16 +130,20 @@ func (b *broker) moveDelayed(ctx context.Context, delayed, tasks string) error {
 	return nil
 }
 
-func (b *broker) fetchTasks(ctx context.Context, key string) (string, error) {
-	reply, err := b.rdb.RPop(ctx, key).Result()
+func (b *broker) fetchTasks(ctx context.Context, timeout time.Duration, keys ...string) (string, error) {
+	reply, err := b.rdb.BRPop(ctx, timeout, keys...).Result()
 	if err == redis.Nil {
 		return "", nil
 	}
 	if err != nil {
-		return "", errors.Wrapf(err, "poll broker %s for %s failed", b.name, key)
+		return "", errors.Wrapf(err, "poll broker %s for %v failed", b.name, keys)
 	}
 
-	return reply, nil
+	if len(reply) != 2 {
+		return "", errors.Wrapf(err, "poll broker %s for %v reply failed: %v", b.name, keys, reply)
+	}
+
+	return reply[1], nil
 }
 
 func (b *broker) makeTaskKeyForBroker(name string) string {
