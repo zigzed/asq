@@ -129,15 +129,12 @@ func testL() error {
 	return nil
 }
 
-var interval = 50 * time.Millisecond
-
 func TestAsq(t *testing.T) {
 	flag.Parse()
 
 	is := is.New(t)
 	app, err := NewAppFromRedis(redis.Option{
-		Addrs:        []string{"127.0.0.1:6379"},
-		PollInterval: interval,
+		Addrs: []string{"127.0.0.1:6379"},
 	}, "test")
 	is.NoErr(err)
 

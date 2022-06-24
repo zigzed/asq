@@ -2,7 +2,6 @@ package asq
 
 import (
 	"context"
-	"time"
 
 	"emperror.dev/errors"
 	"github.com/google/uuid"
@@ -66,11 +65,12 @@ func (app *App) SubmitTask(ctx context.Context, tasks ...*task.Task) (*AsyncResu
 			task.Id = uuid.New().String()
 		}
 	}
-	if task := app.makeTaskLink(tasks...); task != nil {
-		if err := app.broker.Push(ctx, task); err != nil {
-			return nil, errors.Wrapf(err, "push task %v failed", tasks)
-		}
+
+	task := app.makeTaskLink(tasks...)
+	if err := app.broker.Push(ctx, task); err != nil {
+		return nil, errors.Wrapf(err, "push task %v failed", tasks)
 	}
+
 	if len(tasks) > 0 {
 		task := tasks[len(tasks)-1]
 		return &AsyncResult{
@@ -78,7 +78,6 @@ func (app *App) SubmitTask(ctx context.Context, tasks ...*task.Task) (*AsyncResu
 			id:           task.Id,
 			name:         task.Name,
 			ignoreResult: task.Option.IgnoreResult,
-			pollInterval: time.Duration(task.Option.PollInterval) * time.Millisecond,
 		}, nil
 	}
 

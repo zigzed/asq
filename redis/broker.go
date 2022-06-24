@@ -21,9 +21,6 @@ func NewBroker(opt *Option, queueName string) (*broker, error) {
 	if opt == nil {
 		opt = DefaultOption()
 	}
-	if opt.PollInterval == 0 {
-		opt.PollInterval = 500 * time.Millisecond
-	}
 	if opt.Marshaller == nil {
 		opt.Marshaller = marshaller.NewJsonMarshaller()
 	}

@@ -10,7 +10,6 @@ type TaskOption struct {
 	RetryCount    int
 	RetryTimeout  int
 	ResultExpired int
-	PollInterval  int
 	IgnoreResult  bool
 	StartAt       *int64
 }
@@ -31,7 +30,6 @@ func NewTaskOption(retryCount int, retryTimeout time.Duration) *TaskOption {
 		RetryTimeout:  int(retryTimeout.Milliseconds()),
 		IgnoreResult:  false,
 		ResultExpired: 15,
-		PollInterval:  500,
 	}
 }
 
@@ -48,11 +46,6 @@ func (to *TaskOption) WithStartAt(eta time.Time) *TaskOption {
 
 func (to *TaskOption) WithResultExpired(in time.Duration) *TaskOption {
 	to.ResultExpired = int(in.Seconds())
-	return to
-}
-
-func (to *TaskOption) WithPollInterval(timer time.Duration) *TaskOption {
-	to.PollInterval = int(timer.Milliseconds())
 	return to
 }
 

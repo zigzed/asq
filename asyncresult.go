@@ -21,25 +21,7 @@ func (ar *AsyncResult) Wait(ctx context.Context, args ...interface{}) (bool, err
 		return true, nil
 	}
 
-	tick := time.NewTicker(ar.pollInterval)
-
-Loop:
-	for {
-		select {
-		case <-ctx.Done():
-			break Loop
-		case <-tick.C:
-			ok, err := ar.backend.Scan(ctx, ar.id, ar.name, args...)
-			if !ok {
-				continue
-			}
-			return true, err
-		}
-	}
-
-	tick.Stop()
-
-	return false, nil
+	return ar.backend.Scan(ctx, ar.id, ar.name, args...)
 }
 
 func (ar *AsyncResult) Then(ctx context.Context, onSuccess interface{}, onFailed interface{}) {

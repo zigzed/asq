@@ -21,9 +21,6 @@ func NewBackend(opt *Option, queueName string) (*backend, error) {
 	if opt == nil {
 		opt = DefaultOption()
 	}
-	if opt.PollInterval == 0 {
-		opt.PollInterval = 500 * time.Millisecond
-	}
 	if opt.Marshaller == nil {
 		opt.Marshaller = marshaller.NewJsonMarshaller()
 	}
@@ -58,28 +55,40 @@ func (b *backend) Push(ctx context.Context, result *result.Result) error {
 			result.Results, result.Name, result.Id)
 	}
 
-	_, err = b.rdb.Set(ctx, key, buf, result.Timeout).Result()
-	return err
+	if _, err := b.rdb.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.LPush(ctx, key, buf)
+		pipe.Expire(ctx, key, result.Timeout)
+		return nil
+	}); err != nil {
+		return errors.Wrapf(err, "push result %v failed", result)
+	}
+
+	return nil
 }
 
 func (b *backend) Scan(ctx context.Context, id, name string, args ...interface{}) (bool, error) {
 	key := b.makeTaskKeyForBackend(id, name)
+	tmo := 15 * time.Second
+	if Deadline, ok := ctx.Deadline(); ok {
+		tmo = time.Until(Deadline)
+	}
 
-	res, err := b.rdb.Get(ctx, key).Result()
+	res, err := b.rdb.BRPop(ctx, tmo, key).Result()
 	if err == redis.Nil {
 		return false, nil
 	}
 	if err != nil {
 		return false, nil
 	}
+	if len(res) != 2 {
+		return false, errors.Wrapf(err, "unsupported result for %s: %v", name, res)
+	}
 
-	ok, err := b.opt.Marshaller.DecodeResult(res, args...)
+	ok, err := b.opt.Marshaller.DecodeResult(res[1], args...)
 	if !ok {
 		return true, errors.Wrapf(err, "unmarshal result for %s, %s, %s failed",
 			name, id, res)
 	}
-
-	b.rdb.Del(ctx, key)
 
 	return true, err
 }
