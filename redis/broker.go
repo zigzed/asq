@@ -129,7 +129,7 @@ func (b *broker) moveDelayed(ctx context.Context, delayed, tasks string) error {
 
 func (b *broker) fetchTasks(ctx context.Context, timeout time.Duration, keys ...string) (string, error) {
 	reply, err := b.rdb.BRPop(ctx, timeout, keys...).Result()
-	if err == redis.Nil {
+	if errors.Is(err, redis.Nil) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return "", nil
 	}
 	if err != nil {

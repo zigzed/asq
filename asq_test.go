@@ -10,6 +10,7 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/cheekybits/is"
+	"github.com/golang/glog"
 	"github.com/zigzed/asq/redis"
 	"github.com/zigzed/asq/task"
 )
@@ -131,10 +132,11 @@ func testL() error {
 
 func TestAsq(t *testing.T) {
 	flag.Parse()
+	defer glog.Flush()
 
 	is := is.New(t)
 	app, err := NewAppFromRedis(redis.Option{
-		Addrs: []string{"127.0.0.1:6379"},
+		Addrs: []string{"192.168.0.114:13500", "192.168.0.114:13501", "192.168.0.114:13502"},
 	}, "test")
 	is.NoErr(err)
 
@@ -164,11 +166,9 @@ func TestAsq(t *testing.T) {
 	is.NoErr(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	go func() {
-		err = app.StartWorker(ctx, 2)
-		is.NoErr(err)
+		app.StartWorker(ctx, 2)
 	}()
 
 	_, err = app.SubmitTask(ctx, task.NewTask(nil, "testA"))
@@ -187,6 +187,7 @@ func TestAsq(t *testing.T) {
 		errc error
 	)
 	ok, err := ar.Wait(ctx, &valc)
+	is.NoErr(err)
 	is.True(ok)
 	is.Equal(valc, 60)
 	is.NoErr(errc)
@@ -386,6 +387,9 @@ func TestAsq(t *testing.T) {
 	is.NoErr(err)
 
 	time.Sleep(3 * time.Second)
+
+	cancel()
+	time.Sleep(1 * time.Second)
 }
 
 func br() {

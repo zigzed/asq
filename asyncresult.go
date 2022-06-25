@@ -3,7 +3,6 @@ package asq
 import (
 	"context"
 	"reflect"
-	"time"
 
 	"github.com/zigzed/asq/invoker"
 )
@@ -13,7 +12,6 @@ type AsyncResult struct {
 	id           string
 	name         string
 	ignoreResult bool
-	pollInterval time.Duration
 }
 
 func (ar *AsyncResult) Wait(ctx context.Context, args ...interface{}) (bool, error) {

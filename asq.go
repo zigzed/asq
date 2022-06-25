@@ -54,9 +54,9 @@ func (app *App) Register(name string, fn interface{}) error {
 	return app.mgr.register(name, fn)
 }
 
-func (app *App) StartWorker(ctx context.Context, size int) error {
+func (app *App) StartWorker(ctx context.Context, size int) {
 	worker := newWorker(app.broker, app.backend, app.mgr, app.logger)
-	return worker.Start(ctx, size)
+	worker.Start(ctx, size)
 }
 
 func (app *App) SubmitTask(ctx context.Context, tasks ...*task.Task) (*AsyncResult, error) {

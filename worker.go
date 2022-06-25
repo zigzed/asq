@@ -2,13 +2,13 @@ package asq
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"emperror.dev/errors"
 	"github.com/zigzed/asq/invoker"
 	"github.com/zigzed/asq/result"
 	"github.com/zigzed/asq/task"
-	"golang.org/x/sync/errgroup"
 )
 
 type Worker struct {
@@ -30,38 +30,86 @@ func newWorker(broker Broker, backend Backend, mgr *fnManager, logger Logger) *W
 	return w
 }
 
-func (w *Worker) Start(ctx context.Context, size int) error {
-	eg := new(errgroup.Group)
+func (w *Worker) Start(ctx context.Context, size int) {
+	tasks := make(chan *task.Task, size)
+	defer func() {
+		close(tasks)
+	}()
+
+	go func() {
+		w.doPoll(ctx, tasks)
+	}()
+
+	var wg sync.WaitGroup
+	wg.Add(size)
 	for i := 0; i < size; i++ {
-		eg.Go(func() error {
-			return w.doPoll(ctx)
-		})
+		go func() {
+			w.doExecute(ctx, tasks)
+			wg.Done()
+		}()
 	}
 
-	return eg.Wait()
+	wg.Wait()
 }
 
-func (w *Worker) doPoll(ctx context.Context) error {
+func (w *Worker) doPoll(ctx context.Context, tasks chan<- *task.Task) {
+	polledFunc := make(map[string]struct{})
+
+	tick := time.NewTicker(500 * time.Millisecond)
+Loop:
+	for {
+		select {
+		case <-ctx.Done():
+			break Loop
+		case <-tick.C:
+			registered := w.fnMgr.registered()
+			for _, r := range registered {
+				if _, ok := polledFunc[r]; !ok {
+					go w.doPollOne(ctx, r, tasks)
+					polledFunc[r] = struct{}{}
+				}
+			}
+		}
+	}
+	tick.Stop()
+}
+
+func (w *Worker) doPollOne(ctx context.Context, task string, tasks chan<- *task.Task) {
+	w.logger.Infof("asq: polling task %s is starting...", task)
+	defer w.logger.Infof("asq: polling task %s is stopped...", task)
+
 Loop:
 	for {
 		select {
 		case <-ctx.Done():
 			break Loop
 		default:
-			task, err := w.broker.Poll(ctx, time.Second, w.fnMgr.registered()...)
-			if err != nil {
+			task, err := w.broker.Poll(ctx, time.Second, task)
+			if err != nil && !errors.Is(err, context.Canceled) {
 				w.logger.Errorf("polling for task %v failed: %v", w.fnMgr.registered(), err)
 				continue
 			}
 			if task != nil {
-				if err := w.execute(ctx, task); err != nil {
-					w.logger.Errorf("execute task %s failed: %v", w.fnMgr.registered(), err)
-				}
+				tasks <- task
 			}
 		}
 	}
+}
 
-	return nil
+func (w *Worker) doExecute(ctx context.Context, tasks <-chan *task.Task) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case task, ok := <-tasks:
+			if !ok {
+				return
+			}
+			if err := w.execute(ctx, task); err != nil {
+				w.logger.Errorf("execute task %s with %v failed: %v", task.Name, task.Args, err)
+			}
+		}
+	}
 }
 
 func (w *Worker) execute(ctx context.Context, task *task.Task) error {

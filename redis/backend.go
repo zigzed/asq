@@ -67,18 +67,26 @@ func (b *backend) Push(ctx context.Context, result *result.Result) error {
 }
 
 func (b *backend) Scan(ctx context.Context, id, name string, args ...interface{}) (bool, error) {
-	key := b.makeTaskKeyForBackend(id, name)
-	tmo := 15 * time.Second
-	if Deadline, ok := ctx.Deadline(); ok {
-		tmo = time.Until(Deadline)
-	}
+	var (
+		key = b.makeTaskKeyForBackend(id, name)
+		res []string
+		err error
+	)
 
-	res, err := b.rdb.BRPop(ctx, tmo, key).Result()
-	if err == redis.Nil {
-		return false, nil
-	}
-	if err != nil {
-		return false, nil
+	for {
+		tmo := 5 * time.Second
+		if Deadline, ok := ctx.Deadline(); ok {
+			tmo = time.Until(Deadline)
+		}
+
+		res, err = b.rdb.BRPop(ctx, tmo, key).Result()
+		if errors.Is(err, redis.Nil) {
+			continue
+		}
+		if err != nil {
+			return false, err
+		}
+		break
 	}
 	if len(res) != 2 {
 		return false, errors.Wrapf(err, "unsupported result for %s: %v", name, res)
