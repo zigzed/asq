@@ -107,7 +107,7 @@ func (b *broker) doPoll(ctx context.Context, timeout time.Duration, names ...str
 
 func (b *broker) moveDelayed(ctx context.Context, delayed, tasks string) error {
 	script := `
-	local items = redis.call('ZRANGE', KEYS[1], 0, ARGV[1], 'BYSCORE')
+	local items = redis.call('ZRANGEBYSCORE', KEYS[1], 0, ARGV[1])
 	for k, v in pairs(items) do
 		redis.call('LPUSH', KEYS[2], v)
 		redis.call('ZREM', KEYS[1], v)

@@ -126,7 +126,20 @@ func testK() (time.Time, error) {
 
 func testL() error {
 	now := time.Now()
-	fmt.Printf("  inTestK time: %s\n", now.Format("2006-01-02 15:04:05.000000"))
+	fmt.Printf("  inTestL time: %s\n", now.Format("2006-01-02 15:04:05.000000"))
+	return nil
+}
+
+func testN(expected int64) error {
+	now := time.Now()
+	fmt.Printf("  inTestN time: %s, expected: %s\n",
+		now.Format("2006-01-02 15:04:05.000000"),
+		time.Unix(expected, 0).Format("2006-01-02 15:04:05.000000"))
+	return nil
+}
+
+func testP(t time.Time) error {
+	fmt.Printf("  inTestP time: %s\n", t.Format("2006-01-02 15:04:05"))
 	return nil
 }
 
@@ -136,7 +149,8 @@ func TestAsq(t *testing.T) {
 
 	is := is.New(t)
 	app, err := NewAppFromRedis(redis.Option{
-		Addrs: []string{"192.168.0.114:13500", "192.168.0.114:13501", "192.168.0.114:13502"},
+		//Addrs: []string{"192.168.0.114:13500", "192.168.0.114:13501", "192.168.0.114:13502"},
+		Addrs: []string{"192.168.0.114:6379"},
 	}, "test")
 	is.NoErr(err)
 
@@ -164,12 +178,20 @@ func TestAsq(t *testing.T) {
 	is.NoErr(err)
 	err = app.Register("testL", testL)
 	is.NoErr(err)
+	err = app.Register("testN", testN)
+	is.NoErr(err)
+	err = app.Register("testP", testP)
+	is.NoErr(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
 		app.StartWorker(ctx, 2)
 	}()
+
+	_, err = app.SubmitTask(ctx, task.NewTask(nil, "testP", time.Now()))
+	is.NoErr(err)
+	br()
 
 	_, err = app.SubmitTask(ctx, task.NewTask(nil, "testA"))
 	is.NoErr(err)
@@ -385,11 +407,22 @@ func TestAsq(t *testing.T) {
 		task.NewTask(nil, "testL"),
 		task.NewTask(nil, "testL"))
 	is.NoErr(err)
+	br()
 
 	time.Sleep(3 * time.Second)
 
+	_, err = app.SubmitTask(ctx,
+		task.NewTask(nil, "testN", time.Now().Unix()),
+		task.NewTask(
+			task.NewTaskOption(1, 5*time.Second).WithStartAt(time.Now().Add(2*time.Second)),
+			"testN", time.Now().Add(2*time.Second).Unix()))
+	is.NoErr(err)
+	br()
+
+	time.Sleep(6 * time.Second)
+
 	cancel()
-	time.Sleep(1 * time.Second)
+	time.Sleep(5 * time.Second)
 }
 
 func br() {
