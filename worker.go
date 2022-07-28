@@ -53,30 +53,8 @@ func (w *Worker) Start(ctx context.Context, size int) {
 }
 
 func (w *Worker) doPoll(ctx context.Context, tasks chan<- *task.Task) {
-	polledFunc := make(map[string]struct{})
-
-	tick := time.NewTicker(500 * time.Millisecond)
-Loop:
-	for {
-		select {
-		case <-ctx.Done():
-			break Loop
-		case <-tick.C:
-			registered := w.fnMgr.registered()
-			for _, r := range registered {
-				if _, ok := polledFunc[r]; !ok {
-					go w.doPollOne(ctx, r, tasks)
-					polledFunc[r] = struct{}{}
-				}
-			}
-		}
-	}
-	tick.Stop()
-}
-
-func (w *Worker) doPollOne(ctx context.Context, task string, tasks chan<- *task.Task) {
-	w.logger.Infof("asq: polling task %s is starting...", task)
-	defer w.logger.Infof("asq: polling task %s is stopped...", task)
+	w.logger.Infof("asq: polling task %v is starting...", w.fnMgr.registered())
+	defer w.logger.Infof("asq: polling task %v is stopped...", w.fnMgr.registered())
 
 Loop:
 	for {
@@ -84,7 +62,7 @@ Loop:
 		case <-ctx.Done():
 			break Loop
 		default:
-			task, err := w.broker.Poll(ctx, time.Second, task)
+			task, err := w.broker.Poll(ctx, time.Second)
 			if err != nil && !errors.Is(err, context.Canceled) {
 				w.logger.Errorf("polling for task %v failed: %v", w.fnMgr.registered(), err)
 				continue

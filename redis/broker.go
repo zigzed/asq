@@ -3,10 +3,12 @@ package redis
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"emperror.dev/errors"
 	"github.com/go-redis/redis/v8"
+	"github.com/golang/glog"
 	"github.com/zigzed/asq/marshaller"
 	"github.com/zigzed/asq/task"
 )
@@ -15,6 +17,7 @@ type broker struct {
 	rdb  redis.UniversalClient
 	opt  Option
 	name string
+	once sync.Once
 }
 
 func NewBroker(opt *Option, queueName string) (*broker, error) {
@@ -47,7 +50,7 @@ func NewBroker(opt *Option, queueName string) (*broker, error) {
 }
 
 func (b *broker) Push(ctx context.Context, task *task.Task) error {
-	key := b.makeTaskKeyForBroker(task.Name)
+	key := b.makeTaskKeyForBroker()
 	buf, err := b.opt.Marshaller.EncodeTask(task)
 	if err != nil {
 		return errors.Wrapf(err, "encode task %v failed", task)
@@ -59,7 +62,7 @@ func (b *broker) Push(ctx context.Context, task *task.Task) error {
 				task.Name, task.Id, buf)
 		}
 	} else {
-		if _, err := b.rdb.ZAdd(ctx, b.makeDelayedKeyForBroker(task.Name), &redis.Z{
+		if _, err := b.rdb.ZAdd(ctx, b.makeDelayedKeyForBroker(), &redis.Z{
 			Member: buf,
 			Score:  float64(*task.Option.StartAt),
 		}).Result(); err != nil {
@@ -71,26 +74,20 @@ func (b *broker) Push(ctx context.Context, task *task.Task) error {
 	return nil
 }
 
-func (b *broker) Poll(ctx context.Context, timeout time.Duration, names ...string) (*task.Task, error) {
-	return b.doPoll(ctx, timeout, names...)
+func (b *broker) Poll(ctx context.Context, timeout time.Duration) (*task.Task, error) {
+	return b.doPoll(ctx, timeout)
 }
 
 func (b *broker) Close() error {
 	return b.rdb.Close()
 }
 
-func (b *broker) doPoll(ctx context.Context, timeout time.Duration, names ...string) (*task.Task, error) {
-	taskKeys := make([]string, 0, len(names))
-	for _, name := range names {
-		taskKey := b.makeTaskKeyForBroker(name)
-		delayed := b.makeDelayedKeyForBroker(name)
-		taskKeys = append(taskKeys, taskKey)
+func (b *broker) doPoll(ctx context.Context, timeout time.Duration) (*task.Task, error) {
+	b.once.Do(func() {
+		b.startMoveDelayed(ctx)
+	})
 
-		if err := b.moveDelayed(ctx, delayed, taskKey); err != nil {
-			return nil, err
-		}
-	}
-	buf, err := b.fetchTasks(ctx, timeout, taskKeys...)
+	buf, err := b.fetchTasks(ctx, timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +100,29 @@ func (b *broker) doPoll(ctx context.Context, timeout time.Duration, names ...str
 	} else {
 		return task, nil
 	}
+}
+
+func (b *broker) startMoveDelayed(ctx context.Context) {
+	taskKey := b.makeTaskKeyForBroker()
+	delayed := b.makeDelayedKeyForBroker()
+
+	go func() {
+		tick := time.NewTicker(b.opt.PollPeriod)
+
+	Loop:
+		for {
+			select {
+			case <-ctx.Done():
+				break Loop
+			case <-tick.C:
+				if err := b.moveDelayed(ctx, delayed, taskKey); err != nil {
+					glog.Warningf("move delayed from %s to %s failed: %v",
+						delayed, taskKey, err)
+				}
+			}
+		}
+		tick.Stop()
+	}()
 }
 
 func (b *broker) moveDelayed(ctx context.Context, delayed, tasks string) error {
@@ -127,26 +147,27 @@ func (b *broker) moveDelayed(ctx context.Context, delayed, tasks string) error {
 	return nil
 }
 
-func (b *broker) fetchTasks(ctx context.Context, timeout time.Duration, keys ...string) (string, error) {
-	reply, err := b.rdb.BRPop(ctx, timeout, keys...).Result()
+func (b *broker) fetchTasks(ctx context.Context, timeout time.Duration) (string, error) {
+	key := b.makeTaskKeyForBroker()
+	reply, err := b.rdb.BRPop(ctx, timeout, key).Result()
 	if errors.Is(err, redis.Nil) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return "", nil
 	}
 	if err != nil {
-		return "", errors.Wrapf(err, "poll broker %s for %v failed", b.name, keys)
+		return "", errors.Wrapf(err, "poll broker %s for %v failed", b.name, key)
 	}
 
 	if len(reply) != 2 {
-		return "", errors.Wrapf(err, "poll broker %s for %v reply failed: %v", b.name, keys, reply)
+		return "", errors.Wrapf(err, "poll broker %s for %v reply failed: %v", b.name, key, reply)
 	}
 
 	return reply[1], nil
 }
 
-func (b *broker) makeTaskKeyForBroker(name string) string {
-	return fmt.Sprintf("%s.%s.{%s}", b.name, "tasks", name)
+func (b *broker) makeTaskKeyForBroker() string {
+	return fmt.Sprintf("%s.%s", b.name, "tasks")
 }
 
-func (b *broker) makeDelayedKeyForBroker(name string) string {
-	return fmt.Sprintf("%s.%s.{%s}", b.name, "delayed", name)
+func (b *broker) makeDelayedKeyForBroker() string {
+	return fmt.Sprintf("%s.%s", b.name, "delayed")
 }
