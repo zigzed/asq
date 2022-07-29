@@ -144,13 +144,15 @@ func (w *Worker) execute(ctx context.Context, task *task.Task) error {
 
 	if task.Option.RetryCount <= task.BackOff.Attempts {
 		err, _ := lastError.(error)
-		return w.backend.Push(ctx,
+		rer := w.backend.Push(ctx,
 			result.NewResult(
 				task.Id,
 				task.Name,
 				returns,
 				err,
 				time.Duration(task.Option.ResultExpired)*time.Second))
+		w.logger.Errorf("task %s, %s failed: %v", task.Name, task.Id, err)
+		return rer
 	}
 
 	nextAttempt := task.BackOff.NextAttempt()
