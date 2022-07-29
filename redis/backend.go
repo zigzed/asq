@@ -106,5 +106,5 @@ func (b *backend) Close() error {
 }
 
 func (b *backend) makeTaskKeyForBackend(id, name string) string {
-	return fmt.Sprintf("%s.%s.{%s}.%s", b.name, "result", name, id)
+	return fmt.Sprintf("{%s}.%s.%s.%s", b.name, "result", name, id)
 }

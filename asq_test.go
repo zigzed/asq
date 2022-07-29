@@ -149,9 +149,9 @@ func TestAsq(t *testing.T) {
 
 	is := is.New(t)
 	app, err := NewAppFromRedis(redis.Option{
-		//Addrs: []string{"192.168.0.114:13500", "192.168.0.114:13501", "192.168.0.114:13502"},
+		Addrs: []string{"192.168.0.114:13500", "192.168.0.114:13501", "192.168.0.114:13502"},
 		// Addrs:      []string{"192.168.0.114:6379"},
-		Addrs:      []string{"127.0.0.1:6379"},
+		// Addrs:      []string{"127.0.0.1:6379"},
 		PollPeriod: 100 * time.Millisecond,
 	}, "test")
 	is.NoErr(err)

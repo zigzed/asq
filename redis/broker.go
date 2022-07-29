@@ -165,9 +165,9 @@ func (b *broker) fetchTasks(ctx context.Context, timeout time.Duration) (string,
 }
 
 func (b *broker) makeTaskKeyForBroker() string {
-	return fmt.Sprintf("%s.%s", b.name, "tasks")
+	return fmt.Sprintf("{%s}.%s", b.name, "tasks")
 }
 
 func (b *broker) makeDelayedKeyForBroker() string {
-	return fmt.Sprintf("%s.%s", b.name, "delayed")
+	return fmt.Sprintf("{%s}.%s", b.name, "delayed")
 }
