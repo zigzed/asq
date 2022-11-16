@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/golang/glog"
 )
 
 // 通用但是性能比较慢的函数调用参数和结果的反射处理
@@ -231,8 +233,9 @@ func (vk genericInvoker) convert2struct(v, r reflect.Value, rt reflect.Type) (er
 				key = ft.Name
 			}
 			if mv = v.MapIndex(reflect.ValueOf(key)); !mv.IsValid() {
-				err = fmt.Errorf("invalid value returned from map by key: %v", ft)
-				break
+				// err = fmt.Errorf("invalid value returned from map by key: %v", ft)
+				glog.Infof("[ASQ] value of %s:%s returned from map invalid", rt.Name(), key)
+				continue
 			}
 
 			converted, err = vk.convert(mv, fv.Type())

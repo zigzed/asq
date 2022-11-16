@@ -57,3 +57,38 @@ func TestInvoker1(t *testing.T) {
 	is.NoErr(err)
 	fmt.Printf("output: %v\n", string(output))
 }
+
+func TestAddElement(t *testing.T) {
+	is := is.New(t)
+
+	inputs := `
+[
+	{
+		"A": "a",
+		"B": 1,
+		"C": {
+			"M": "m",
+			"N": 666
+		},
+		"X": null,
+		"D": 123 
+	}
+]
+	`
+
+	vk := NewGenericInvoker()
+
+	var args []interface{}
+	err := json.Unmarshal([]byte(inputs), &args)
+	is.NoErr(err)
+
+	rs, err := vk.Invoke(testFunc1, args)
+	is.NoErr(err)
+
+	rv, err := vk.Return(testFunc1, rs)
+	is.NoErr(err)
+
+	output, err := json.Marshal(rv)
+	is.NoErr(err)
+	fmt.Printf("output: %v\n", string(output))
+}
