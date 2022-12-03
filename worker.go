@@ -62,7 +62,7 @@ Loop:
 		case <-ctx.Done():
 			break Loop
 		default:
-			task, err := w.broker.Poll(ctx, time.Second)
+			task, err := w.broker.Poll(ctx, 30*time.Second)
 			if err != nil && !errors.Is(err, context.Canceled) {
 				w.logger.Errorf("polling for task %v failed: %v", w.fnMgr.registered(), err)
 				continue
