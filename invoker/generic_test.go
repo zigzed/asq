@@ -2,21 +2,33 @@ package invoker
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
+	"os"
 	"testing"
 
 	"emperror.dev/errors"
 	"github.com/cheekybits/is"
+	"github.com/golang/glog"
 )
 
 type testStruct1 struct {
 	A string
 	B int
-	X *int
+	X *int `json:"X,omitempty"`
 	C struct {
 		M string
-		N int
+		N int `json:"N,omitempty"`
 	}
+}
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+
+	exitCode := m.Run()
+	glog.Flush()
+
+	os.Exit(exitCode)
 }
 
 func testFunc1(i testStruct1) (string, error) {
